@@ -4,3 +4,8 @@ __pycache__/
 db.sqlite3
 media/
 .vscode/
+*.pyc
+fer2013/
+fer2013.csv
+test_yuz.jpg
+ai_ne_gordu.jpg

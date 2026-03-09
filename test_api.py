@@ -1,45 +1,31 @@
 import requests
-import random
 
-BASE_URL = "http://127.0.0.1:8000/api/auth"
 
-random_number = random.randint(1000, 9999)
-email = f"testuser{random_number}@example.com"
-password = "TestPassword123!"
+resim_yolu = "test_yuz.jpg" 
 
-print(f"--- 1. TEST: KAYIT OLMA ({email}) ---")
-register_data = {
-    "email": email,
-    "password": password
-}
+
+url = "http://127.0.0.1:8000/api/interview/analyze/"
+
+print(f"🤖 Yapay zekaya '{resim_yolu}' gönderiliyor...")
 
 try:
-    response = requests.post(f"{BASE_URL}/register/", data=register_data)
     
-    if response.status_code == 201:
-        print("✅ BAŞARILI: Kullanıcı oluşturuldu!")
-        print("Gelen Cevap:", response.json())
-    else:
-        print("❌ HATA: Kayıt olunamadı.")
-        print("Hata Kodu:", response.status_code)
-        print("Detay:", response.text)
+    with open(resim_yolu, 'rb') as f:
+        files = {'image': f}
+        response = requests.post(url, files=files)
 
-    print("\n--- 2. TEST: GİRİŞ YAPMA (Token Alma) ---")
-    login_data = {
-        "email": email,
-        "password": password
-    }
     
-    login_response = requests.post(f"{BASE_URL}/login/", data=login_data)
-    
-    if login_response.status_code == 200:
-        print("✅ BAŞARILI: Giriş yapıldı ve Anahtar (Token) alındı!")
-        tokens = login_response.json()
-        print(f"Access Token (İlk 20 karakter): {tokens['access'][:20]}...")
+    if response.status_code == 200:
+        print("\n✅ API BAŞARIYLA CEVAP VERDİ:")
+        print("-" * 30)
+        veri = response.json()
+        print(f"Yüz Bulundu mu? : {veri.get('face_detected')}")
+        print(f"Göz Teması Skoru: {veri.get('eye_contact_score')}")
+        print(f"Duygu Tahmini   : {veri.get('emotion')} (% {veri.get('emotion_confidence')})")
+        print("-" * 30)
     else:
-        print("❌ HATA: Giriş yapılamadı.")
-        print("Detay:", login_response.text)
+        print(f"❌ SUNUCU HATASI ({response.status_code}):", response.text)
 
-except Exception as e:
-    print("❌ SUNUCUYA ULAŞILAMADI!")
-    print(f"Hata: {e}")
+except FileNotFoundError:
+    print(f"❌ Hata: '{resim_yolu}' adında bir fotoğraf bulunamadı!")
+    print("Lütfen proje klasörüne bir fotoğraf koyup adını doğru yazdığından emin ol.")
