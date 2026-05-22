@@ -1,7 +1,6 @@
 from django.urls import path
-from .views import InterviewSessionListCreateView, AnalyzeFrameView
+from .views import InterviewCreateView
 
 urlpatterns = [
-    path('sessions/', InterviewSessionListCreateView.as_view(), name='session-list-create'),
-    path('analyze/', AnalyzeFrameView.as_view(), name='analyze'), 
+    path('create/', InterviewCreateView.as_view(), name="create_session")
 ]

@@ -1,37 +1,15 @@
-from rest_framework import generics, permissions
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser
+from rest_framework.permissions import IsAuthenticated
 
 from .models import InterviewSession
-from .serializers import InterviewSessionSerializer
-from .ai_processor import InterviewAI
+from .serializers import InterviewSessionCreateSerializer
 
-ai_engine = InterviewAI()
+class InterviewCreateView(APIView):
+    permission_classes = [IsAuthenticated]
 
-class InterviewSessionListCreateView(generics.ListCreateAPIView):
-    serializer_class = InterviewSessionSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return InterviewSession.objects.filter(user=self.request.user).order_by('-created_at')
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-class AnalyzeFrameView(APIView):
-    parser_classes = [MultiPartParser]
-    
-
-    def post(self, request, format=None):
-        
-        if 'image' not in request.data:
-            return Response({"error": "Resim bulunamadı. Lütfen 'image' anahtarı ile gönderin."}, status=400)
-
-        image_file = request.data['image']
-        image_bytes = image_file.read()
-
-        
-        result = ai_engine.process_frame(image_bytes)
-
-        return Response(result)
+    def post(self, request):
+        session = InterviewSession.objects.create(user=request.user)
+        serializer = InterviewSessionCreateSerializer(session)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
