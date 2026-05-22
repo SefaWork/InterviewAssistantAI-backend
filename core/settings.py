@@ -131,3 +131,9 @@ SIMPLE_JWT = {
     'AUTH_COOKIE_SAMESITE': 'None',
     'AUTH_COOKIE_PATH': '/',
 }
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication'
+    ]
+}
