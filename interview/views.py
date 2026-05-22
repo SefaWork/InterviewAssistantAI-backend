@@ -7,22 +7,17 @@ from .models import InterviewSession
 from .serializers import InterviewSessionSerializer
 from .ai_processor import InterviewAI
 
-
 ai_engine = InterviewAI()
-
 
 class InterviewSessionListCreateView(generics.ListCreateAPIView):
     serializer_class = InterviewSessionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        
         return InterviewSession.objects.filter(user=self.request.user).order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-
-
 
 class AnalyzeFrameView(APIView):
     parser_classes = [MultiPartParser]

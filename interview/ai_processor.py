@@ -42,7 +42,6 @@ class InterviewAI:
         if face_detected and self.emotion_model:
             (x, y, w, h) = faces[0]
             
-            
             margin_x = int(w * 0.2)
             margin_y = int(h * 0.2)
             
@@ -52,13 +51,9 @@ class InterviewAI:
             y2 = min(frame.shape[0], y + h + margin_y)
             
             face_roi = frame[y1:y2, x1:x2]
-            
-            
             face_rgb = cv2.cvtColor(face_roi, cv2.COLOR_BGR2RGB)
             
-            
             cv2.imwrite("ai_ne_gordu.jpg", cv2.cvtColor(face_rgb, cv2.COLOR_RGB2BGR))
-            
             
             resized_face = cv2.resize(face_rgb, (96, 96))
             img_array = np.array(resized_face, dtype=np.float32)

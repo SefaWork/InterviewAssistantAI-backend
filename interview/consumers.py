@@ -14,15 +14,15 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         print(f"Client disconnected: {close_code}")
 
     async def receive(self, text_data=None, bytes_data=None):
-        # Handle binary image data directly
+        # Handle binary image data directly.
         if bytes_data:
             result = await self.process_image(bytes_data)
             await self.send(text_data=json.dumps({
                 "type": "result",
                 "data": result
             }))
-
-        # Handle JSON messages (e.g. base64 image or control signals)
+        
+        # Handle JSON data.
         elif text_data:
             message = json.loads(text_data)
 
@@ -38,6 +38,4 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
                 await self.send(text_data=json.dumps({"type": "pong"}))
 
     async def process_image(self, image_bytes: bytes) -> dict:
-        # Your image processing logic here
-        # e.g. run ML model, extract metadata, etc.
         return ai_engine.process_frame(image_bytes)
