@@ -1,14 +1,20 @@
 import base64
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.contrib.auth.models import AnonymousUser
 from .ai_processor import InterviewAI
 
 ai_engine = InterviewAI()
 
 class ImageStreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        if not self.scope["user"] or isinstance(self.scope["user"], AnonymousUser):
+            await self.close(code=4401)
+            print("Unauthorized client detected.")
+            return
+        
         await self.accept()
-        print("Client connected")
+        print("Authorized client connected.")
 
     async def disconnect(self, close_code):
         print(f"Client disconnected: {close_code}")
