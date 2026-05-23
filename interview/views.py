@@ -6,10 +6,16 @@ from rest_framework.permissions import IsAuthenticated
 from .models import InterviewSession
 from .serializers import InterviewSessionCreateSerializer
 
+import secrets
+from django.core.cache import cache
+
 class InterviewCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        session = InterviewSession.objects.create(user=request.user)
-        serializer = InterviewSessionCreateSerializer(session)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        #session = InterviewSession.objects.create(user=request.user)
+        #serializer = InterviewSessionCreateSerializer(session)
+        ticket = secrets.token_urlsafe(32)
+        cache.set(f"ws_ticket:{ticket}", request.user.id, timeout=30)
+        return Response({"ticket": ticket}, status=status.HTTP_201_CREATED)
+        
