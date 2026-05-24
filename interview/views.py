@@ -13,9 +13,11 @@ class InterviewCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        #session = InterviewSession.objects.create(user=request.user)
-        #serializer = InterviewSessionCreateSerializer(session)
+        # Create session.
+        session = InterviewSession.objects.create(user=request.user)
+        serializer = InterviewSessionCreateSerializer(session)
+
+        # Create access ticket.
         ticket = secrets.token_urlsafe(32)
         cache.set(f"ws_ticket:{ticket}", request.user.id, timeout=30)
-        return Response({"ticket": ticket}, status=status.HTTP_201_CREATED)
-        
+        return Response({**serializer.data, "ticket": ticket}, status=status.HTTP_201_CREATED)
