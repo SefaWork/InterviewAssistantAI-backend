@@ -14,7 +14,7 @@ class SessionListView(APIView):
         page_size = 10
         offset = (page - 1) * page_size
 
-        sessions = InterviewSession.objects.filter(user=request.user)[offset:offset + page_size]
+        sessions = InterviewSession.objects.filter(user=request.user).order_by("-created_at")[offset:offset + page_size]
         serializer = SessionListSerializer(sessions, many=True)
         return Response(serializer.data)
 

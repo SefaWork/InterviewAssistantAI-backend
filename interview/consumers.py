@@ -63,8 +63,14 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
     async def process_image(self, image_bytes: bytes) -> dict:
         result = ai_engine.process_frame(image_bytes)
         newAvgs = await self.add_result(result)
-        return {**result, "emotion_avg": newAvgs[0], "eye_avg": newAvgs[1]}
+
+        if newAvgs is None:
+            await self.send(text_data=json.dumps({"type": "session_complete"}))
+            await self.close()
+            return
     
+        return {**result, "emotion_avg": newAvgs[0], "eye_avg": newAvgs[1]}
+
     @database_sync_to_async
     def add_result(self, result):
         if "error" not in result:
@@ -72,6 +78,13 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             self.session.frame_count+=1
             self.session.emotion_score_total+=ai_engine.emotion_scores.get(result["emotion"], 0)
             self.session.eye_score_total+=100 # TODO
+
+            # TODO: Change hardcoded frame count. (Low priority)
+            if self.session.frame_count > 5 * 5:
+                self.session.completed = True
+                self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total", "completed"])
+                return None
+            
             self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
             
         return [round(self.session.emotion_score_total / self.session.frame_count, 1), round(self.session.eye_score_total / self.session.frame_count, 1)]
