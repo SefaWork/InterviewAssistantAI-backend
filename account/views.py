@@ -111,4 +111,7 @@ class DeleteAccountView(APIView):
             return Response({"error": "Password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
 
         user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        response.delete_cookie('refresh_token')
+
+        return response
