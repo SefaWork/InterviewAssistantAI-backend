@@ -24,6 +24,16 @@ class InterviewAI:
             4: 'Nötr', 5: 'Üzgün', 6: 'Şaşkın'
         }
 
+        self.emotion_scores = {
+            "Kızgın": 0,
+            "İğrenme": 0,
+            "Korku": 10,
+            "Mutlu": 100,
+            "Nötr": 75,
+            "Üzgün": 25,
+            "Şaşkın": 50
+        }
+
     def process_frame(self, image_data):
         nparr = np.frombuffer(image_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
