@@ -23,6 +23,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             print("Session not found.")
             return
 
+        self._session_completed = False
         await self.accept()
         print("Authorized client connected.")
 
@@ -37,13 +38,17 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         print(f"Client disconnected: {close_code}")
 
     async def receive(self, text_data=None, bytes_data=None):
+        if self._session_completed:
+            return
+
         # Handle binary image data directly.
         if bytes_data:
             result = await self.process_image(bytes_data)
-            await self.send(text_data=json.dumps({
-                "type": "result",
-                "data": result
-            }))
+            if result is not None:
+                await self.send(text_data=json.dumps({
+                    "type": "result",
+                    "data": result
+                }))
         
         # Handle JSON data.
         elif text_data:
@@ -52,10 +57,12 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             if message["type"] == "image":
                 image_bytes = base64.b64decode(message["data"])
                 result = await self.process_image(image_bytes)
-                await self.send(text_data=json.dumps({
-                    "type": "result",
-                    "data": result
-                }))
+                
+                if result is not None:
+                    await self.send(text_data=json.dumps({
+                        "type": "result",
+                        "data": result
+                    }))
 
             elif message["type"] == "ping":
                 await self.send(text_data=json.dumps({"type": "pong"}))
@@ -65,9 +72,10 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         newAvgs = await self.add_result(result)
 
         if newAvgs is None:
+            self._session_completed = True
             await self.send(text_data=json.dumps({"type": "session_complete"}))
             await self.close()
-            return
+            return None
     
         return {**result, "emotion_avg": newAvgs[0], "eye_avg": newAvgs[1]}
 
