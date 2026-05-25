@@ -6,10 +6,6 @@ from rest_framework.permissions import IsAuthenticated
 from .models import InterviewSession
 from .serializers import InterviewSessionCreateSerializer
 
-import secrets
-from django.core.cache import cache
-from django.shortcuts import get_object_or_404
-
 class InterviewCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -29,21 +25,4 @@ class InterviewCreateView(APIView):
         session = InterviewSession.objects.create(user=request.user)
         serializer = InterviewSessionCreateSerializer(session)
 
-        # Create access ticket.
-        ticket = secrets.token_urlsafe(32)
-        cache.set(f"ws_ticket:{ticket}", request.user.id, timeout=30)
-        return Response({**serializer.data, "ticket": ticket}, status=status.HTTP_201_CREATED)
-
-class InterviewContinueView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, session_id):
-        if not InterviewSession.objects.filter(user=request.user, id=session_id, completed=False).exists():
-            return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Create access ticket. 
-        ticket = secrets.token_urlsafe(32)
-        cache.set(f"ws_ticket:{ticket}", request.user.id, timeout=30)
-
-        # Client already knows session id, no need to send it again.
-        return Response({"ticket": ticket}, status=status.HTTP_200_OK)
+        return Response({**serializer.data}, status=status.HTTP_201_CREATED)
