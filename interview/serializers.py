@@ -5,5 +5,4 @@ from .models import InterviewSession
 class InterviewSessionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = InterviewSession
-        fields = ['id', 'user']
-        read_only_fields = ['user']
+        fields = ['id']

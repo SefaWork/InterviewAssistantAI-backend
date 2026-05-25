@@ -5,6 +5,7 @@ from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from .ai_processor import InterviewAI
 from .models import InterviewSession
+from django.core.cache import cache
 
 ai_engine = InterviewAI()
 
@@ -16,7 +17,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             return
         
         session_id = self.scope["url_route"]["kwargs"]["session_id"]
-        self.session = await self.get_session(session_id)
+        self.session = await self.try_claim_session(session_id)
 
         if not self.session:
             await self.close(code=4404)
@@ -28,13 +29,28 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         print("Authorized client connected.")
 
     @database_sync_to_async
-    def get_session(self, session_id):
+    def try_claim_session(self, session_id):
         try:
-            return InterviewSession.objects.get(id=session_id, user=self.scope["user"])
+            session = InterviewSession.objects.get(id=session_id, user=self.scope["user"], completed=False)
         except InterviewSession.DoesNotExist:
             return None
 
+        lock_key = f"session_lock:{session_id}"
+        claimed = cache.add(lock_key, 1, timeout=3600)
+        if not claimed:
+            return None
+
+        return session
+
+    @database_sync_to_async
+    def release_session(self):
+        if not self.session:
+            return
+        
+        cache.delete(f"session_lock:{self.session.id}")
+
     async def disconnect(self, close_code):
+        await self.release_session()
         print(f"Client disconnected: {close_code}")
 
     async def receive(self, text_data=None, bytes_data=None):
