@@ -9,6 +9,22 @@ from django.core.cache import cache
 
 ai_engine = InterviewAI()
 
+def create_feedback_for_score(score_name, score_value):
+    if (score_value < 0.5):
+        return f"{score_name}:bad;"
+    elif (score_value < 0.75):
+        return f"{score_name}:average;"
+    else:
+        return f"{score_name}:good;"
+
+def create_comparison_for_score(score_name, old_value, new_value):
+    if (old_value < new_value):
+        return f"{score_name}:better;"
+    elif (old_value > new_value):
+        return f"{score_name}:worse;"
+    else:
+        return f"{score_name}:same;"
+
 class ImageStreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         if not self.scope["user"] or isinstance(self.scope["user"], AnonymousUser):
@@ -49,6 +65,16 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         
         cache.delete(f"session_lock:{self.session.id}")
 
+    @database_sync_to_async
+    def get_latest_completed_session(self):
+        if not self.session:
+            return None
+        
+        try:
+            return InterviewSession.objects.filter(user=self.scope["user"], completed=True).exclude(id=self.session.id).latest()
+        except InterviewSession.DoesNotExist:
+            return None
+
     async def disconnect(self, close_code):
         await self.release_session()
         print(f"Client disconnected: {close_code}")
@@ -88,12 +114,37 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         newAvgs = await self.add_result(result)
 
         if newAvgs is None:
-            self._session_completed = True
+            await self.complete_session(await self.get_latest_completed_session())
             await self.send(text_data=json.dumps({"type": "session_complete"}))
             await self.close()
             return None
     
         return {**result, "emotion_avg": newAvgs[0], "eye_avg": newAvgs[1]}
+
+    @database_sync_to_async
+    def complete_session(self, latest_session):
+        self.session.completed = True
+        self.session.save(update_fields=["completed"])
+        self._session_completed = True
+
+        # Create feedback.
+        new_emotion_score = self.session.emotion_score_total / self.session.frame_count
+        new_eye_score = self.session.eye_score_total / self.session.frame_count
+
+        feedback = create_feedback_for_score("emotion", new_emotion_score) + create_feedback_for_score("eye", new_eye_score)
+
+        self.session.feedback = feedback
+        if latest_session:
+            old_emotion_score = latest_session.emotion_score_total / latest_session.frame_count
+            old_eye_score = latest_session.eye_score_total / latest_session.frame_count
+
+            past_feedback = create_comparison_for_score("emotion", old_emotion_score, new_emotion_score) + create_comparison_for_score("eye", old_eye_score, new_eye_score)
+            self.session.past_analysis_feedback = past_feedback
+        else:
+            self.session.past_analysis_feedback = ""
+
+        self.session.save(update_fields=["completed", "feedback", "past_analysis_feedback"])
+        return None
 
     @database_sync_to_async
     def add_result(self, result):
@@ -102,14 +153,12 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             self.session.frame_count+=1
             self.session.emotion_score_total+=ai_engine.emotion_scores.get(result["emotion"], 0)
             self.session.eye_score_total+=100 # TODO
+            self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
 
             # TODO: Change hardcoded frame count. (Low priority)
             if self.session.frame_count > 5 * 5:
-                self.session.completed = True
-                self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total", "completed"])
                 return None
             
-            self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
             
         return [round(self.session.emotion_score_total / self.session.frame_count, 1), round(self.session.eye_score_total / self.session.frame_count, 1)]
 
