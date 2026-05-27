@@ -21,7 +21,7 @@ class SessionDisplaySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InterviewSession
-        fields = ('id', 'created_at', 'emotion_avg', 'eye_avg', 'total_avg', 'feedback')
+        fields = ('id', 'created_at', 'emotion_avg', 'eye_avg', 'total_avg', 'feedback', 'past_analysis_feedback')
 
     def get_emotion_avg(self, obj):
         if obj.frame_count == 0:
