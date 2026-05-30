@@ -9,6 +9,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from rest_framework import status
+from math import ceil
 
 User = get_user_model()
 
@@ -21,9 +22,18 @@ class SessionListView(APIView):
         page_size = 10
         offset = (page - 1) * page_size
 
-        sessions = InterviewSession.objects.filter(user=request.user).order_by("-created_at")[offset:offset + page_size]
+        queryset = InterviewSession.objects.filter(user=request.user)
+        total_count = queryset.count()
+        total_pages = ceil(total_count / page_size)
+
+        sessions = queryset.order_by("-created_at")[offset:offset + page_size]
         serializer = SessionListSerializer(sessions, many=True)
-        return Response(serializer.data)
+
+        return Response({
+            "results": serializer.data,
+            "total_pages": total_pages,
+            "page": page,
+        })
 
 # Gives more detailed information about a specific session.
 class SessionDisplayView(APIView):
