@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from .models import InterviewSession
+from .models import OngoingInterviewSession
 from .serializers import InterviewSessionCreateSerializer
 
 class InterviewCreateView(APIView):
@@ -11,7 +11,7 @@ class InterviewCreateView(APIView):
 
     def post(self, request):
         # Reject if user has an ongoing session.
-        ongoing = InterviewSession.objects.filter(user=request.user, completed=False).first()
+        ongoing = request.user.interview_sessions.first()
         if ongoing:
             return Response(
                 {
@@ -22,7 +22,7 @@ class InterviewCreateView(APIView):
             )
 
         # Create session.
-        session = InterviewSession.objects.create(user=request.user)
+        session = OngoingInterviewSession.objects.create(user=request.user)
         serializer = InterviewSessionCreateSerializer(session)
 
-        return Response({**serializer.data}, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

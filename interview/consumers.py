@@ -4,10 +4,13 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from .ai_processor import InterviewAI
-from .models import InterviewSession
+from .models import OngoingInterviewSession, CompletedInterviewSession
 from django.core.cache import cache
+import time
 
 ai_engine = InterviewAI()
+
+SESSION_COMPLETE_TIME = 60.0
 
 def create_feedback_for_score(score_name, score_value):
     if (score_value < 0.5):
@@ -40,15 +43,17 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             print("Session not found.")
             return
 
-        self._session_completed = False
+        self.session_completed = False
+        self.session_start = time.monotonic() - self.session.elapsed_time
+
         await self.accept()
         print("Authorized client connected.")
 
     @database_sync_to_async
     def try_claim_session(self, session_id):
         try:
-            session = InterviewSession.objects.get(id=session_id, user=self.scope["user"], completed=False)
-        except InterviewSession.DoesNotExist:
+            session = self.scope["user"].interview_sessions.get(id=session_id)
+        except OngoingInterviewSession.DoesNotExist:
             return None
 
         lock_key = f"session_lock:{session_id}"
@@ -60,8 +65,11 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def release_session(self):
-        if not self.session:
+        if not self.session or self.session_completed:
             return
+        
+        self.session.elapsed_time = time.monotonic() - self.session_start
+        self.session.save(update_fields=["elapsed_time"])
         
         cache.delete(f"session_lock:{self.session.id}")
 
@@ -71,8 +79,8 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             return None
         
         try:
-            return InterviewSession.objects.filter(user=self.scope["user"], completed=True).exclude(id=self.session.id).latest()
-        except InterviewSession.DoesNotExist:
+            return self.scope["user"].completed_interviews.latest()
+        except CompletedInterviewSession.DoesNotExist:
             return None
 
     async def disconnect(self, close_code):
@@ -80,7 +88,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         print(f"Client disconnected: {close_code}")
 
     async def receive(self, text_data=None, bytes_data=None):
-        if self._session_completed:
+        if self.session_completed:
             return
 
         # Handle binary image data directly.
@@ -114,8 +122,12 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         newAvgs = await self.add_result(result)
 
         if newAvgs is None:
-            await self.complete_session(await self.get_latest_completed_session())
-            await self.send(text_data=json.dumps({"type": "session_complete"}))
+            completed_session_id = await self.complete_session(await self.get_latest_completed_session())
+            if completed_session_id is None:
+                await self.send(text_data=json.dumps({"type": "session_complete"}))
+            else:
+                await self.send(text_data=json.dumps({"type": "session_complete", "id": str(completed_session_id)}))
+
             await self.close()
             return None
     
@@ -123,28 +135,24 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def complete_session(self, latest_session):
-        self.session.completed = True
-        self.session.save(update_fields=["completed"])
-        self._session_completed = True
+        if (self.session_completed):
+            return None
+        self.session_completed = True
 
-        # Create feedback.
-        new_emotion_score = self.session.emotion_score_total / self.session.frame_count
-        new_eye_score = self.session.eye_score_total / self.session.frame_count
+        # Create completed interview.
+        emotion_score = round(self.session.emotion_score_total / self.session.frame_count, 1)
+        eye_score = round(self.session.eye_score_total / self.session.frame_count, 1)
+        total_score = round((emotion_score + eye_score) / 2, 1)
 
-        feedback = create_feedback_for_score("emotion", new_emotion_score) + create_feedback_for_score("eye", new_eye_score)
+        feedback = create_feedback_for_score("emotion", emotion_score) + create_feedback_for_score("eye", eye_score)
+        past_analysis_feedback = ""
 
-        self.session.feedback = feedback
         if latest_session:
-            old_emotion_score = latest_session.emotion_score_total / latest_session.frame_count
-            old_eye_score = latest_session.eye_score_total / latest_session.frame_count
-
-            past_feedback = create_comparison_for_score("emotion", old_emotion_score, new_emotion_score) + create_comparison_for_score("eye", old_eye_score, new_eye_score)
-            self.session.past_analysis_feedback = past_feedback
-        else:
-            self.session.past_analysis_feedback = ""
-
-        self.session.save(update_fields=["completed", "feedback", "past_analysis_feedback"])
-        return None
+            past_analysis_feedback = create_comparison_for_score("emotion", latest_session.emotion_score, emotion_score) + create_comparison_for_score("eye", latest_session.eye_score, eye_score)
+        
+        completed_session = CompletedInterviewSession.objects.create(user=self.scope["user"], emotion_score=emotion_score, eye_score=eye_score, total_score=total_score, feedback=feedback, past_analysis_feedback=past_analysis_feedback)
+        self.session.delete()
+        return completed_session.id
 
     @database_sync_to_async
     def add_result(self, result):
@@ -155,10 +163,8 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             self.session.eye_score_total+=100 # TODO
             self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
 
-            # TODO: Change hardcoded frame count. (Low priority)
-            if self.session.frame_count > 5 * 5:
+            if time.monotonic() - self.session_start > SESSION_COMPLETE_TIME:
                 return None
-            
             
         return [round(self.session.emotion_score_total / self.session.frame_count, 1), round(self.session.eye_score_total / self.session.frame_count, 1)]
 

@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
-from interview.models import InterviewSession
+from interview.models import CompletedInterviewSession, OngoingInterviewSession
 from .serializers import SessionListSerializer, SessionDisplaySerializer
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -22,7 +22,7 @@ class SessionListView(APIView):
         page_size = 10
         offset = (page - 1) * page_size
 
-        queryset = InterviewSession.objects.filter(user=request.user)
+        queryset = request.user.completed_interviews
         total_count = queryset.count()
         total_pages = ceil(total_count / page_size)
 
@@ -40,21 +40,16 @@ class SessionDisplayView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        session = get_object_or_404(InterviewSession, pk=pk, user=request.user)
+        session = get_object_or_404(CompletedInterviewSession, pk=pk, user=request.user)
         serializer = SessionDisplaySerializer(session)
         return Response(serializer.data)
 
+# Deletes specific interview.
 class DeleteSessionView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        user = request.user
-        session_id = request.data.get('session_id')
-
-        if not session_id:
-            return Response({"error": "Session ID is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        session = get_object_or_404(InterviewSession, id=session_id, user=user)
+    def delete(self, request, pk):
+        session = get_object_or_404(CompletedInterviewSession, pk=pk, user=request.user)
         session.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
