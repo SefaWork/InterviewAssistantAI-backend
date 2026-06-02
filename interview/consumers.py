@@ -160,7 +160,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             # There was no error, update session scores.
             self.session.frame_count+=1
             self.session.emotion_score_total+=ai_engine.emotion_scores.get(result["emotion"], 0)
-            self.session.eye_score_total+=100 # TODO
+            self.session.eye_score_total+=result["eye_contact_score"]
             self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
 
             if time.monotonic() - self.session_start > SESSION_COMPLETE_TIME:
