@@ -10,7 +10,7 @@ import time
 
 ai_engine = InterviewAI()
 
-SESSION_COMPLETE_TIME = 60.0
+SESSION_MAX_TIME = 60.0 * 15.0 # 15 minutes.
 
 def create_feedback_for_score(score_name, score_value):
     if (score_value < 0.5):
@@ -35,8 +35,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             print("Unauthorized client detected.")
             return
         
-        session_id = self.scope["url_route"]["kwargs"]["session_id"]
-        self.session = await self.try_claim_session(session_id)
+        self.session = await self.try_claim_session()
 
         if not self.session:
             await self.close(code=4404)
@@ -44,20 +43,21 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             return
 
         self.session_completed = False
+        self.marked_complete = False
         self.session_start = time.monotonic() - self.session.elapsed_time
 
         await self.accept()
         print("Authorized client connected.")
 
     @database_sync_to_async
-    def try_claim_session(self, session_id):
+    def try_claim_session(self):
         try:
-            session = self.scope["user"].interview_sessions.get(id=session_id)
+            session = self.scope["user"].ongoing_session
         except OngoingInterviewSession.DoesNotExist:
             return None
 
-        lock_key = f"session_lock:{session_id}"
-        claimed = cache.add(lock_key, 1, timeout=3600)
+        lock_key = f"session_lock:{self.scope["user"].id}"
+        claimed = cache.add(lock_key, 1, timeout=SESSION_MAX_TIME)
         if not claimed:
             return None
 
@@ -65,13 +65,10 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def release_session(self):
-        if not self.session or self.session_completed:
-            return
-        
-        self.session.elapsed_time = time.monotonic() - self.session_start
-        self.session.save(update_fields=["elapsed_time"])
-        
-        cache.delete(f"session_lock:{self.session.id}")
+        if self.session and not self.session_completed:
+            self.session.elapsed_time = time.monotonic() - self.session_start
+            self.session.save(update_fields=["elapsed_time"])
+        cache.delete(f"session_lock:{self.scope["user"].id}")
 
     @database_sync_to_async
     def get_latest_completed_session(self):
@@ -104,15 +101,8 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         elif text_data:
             message = json.loads(text_data)
 
-            if message["type"] == "image":
-                image_bytes = base64.b64decode(message["data"])
-                result = await self.process_image(image_bytes)
-                
-                if result is not None:
-                    await self.send(text_data=json.dumps({
-                        "type": "result",
-                        "data": result
-                    }))
+            if message["type"] == "finish":
+                self.marked_complete = True
 
             elif message["type"] == "ping":
                 await self.send(text_data=json.dumps({"type": "pong"}))
@@ -121,7 +111,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         result = ai_engine.process_frame(image_bytes)
         newAvgs = await self.add_result(result)
 
-        if newAvgs is None:
+        if self.marked_complete or time.monotonic() - self.session_start > SESSION_MAX_TIME:
             completed_session_id = await self.complete_session(await self.get_latest_completed_session())
             if completed_session_id is None:
                 await self.send(text_data=json.dumps({"type": "session_complete"}))
@@ -144,13 +134,15 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         eye_score = round(self.session.eye_score_total / self.session.frame_count, 1)
         total_score = round((emotion_score + eye_score) / 2, 1)
 
+        duration = time.monotonic() - self.session_start
+
         feedback = create_feedback_for_score("emotion", emotion_score) + create_feedback_for_score("eye", eye_score)
         past_analysis_feedback = ""
 
         if latest_session:
             past_analysis_feedback = create_comparison_for_score("emotion", latest_session.emotion_score, emotion_score) + create_comparison_for_score("eye", latest_session.eye_score, eye_score)
         
-        completed_session = CompletedInterviewSession.objects.create(user=self.scope["user"], emotion_score=emotion_score, eye_score=eye_score, total_score=total_score, feedback=feedback, past_analysis_feedback=past_analysis_feedback)
+        completed_session = CompletedInterviewSession.objects.create(user=self.scope["user"], emotion_score=emotion_score, eye_score=eye_score, total_score=total_score, feedback=feedback, past_analysis_feedback=past_analysis_feedback, duration=duration)
         self.session.delete()
         return completed_session.id
 
@@ -162,9 +154,6 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             self.session.emotion_score_total+=ai_engine.emotion_scores.get(result["emotion"], 0)
             self.session.eye_score_total+=result["eye_contact_score"]
             self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
-
-            if time.monotonic() - self.session_start > SESSION_COMPLETE_TIME:
-                return None
             
         return [round(self.session.emotion_score_total / self.session.frame_count, 1), round(self.session.eye_score_total / self.session.frame_count, 1)]
 
