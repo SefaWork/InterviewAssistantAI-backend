@@ -47,6 +47,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         self.session_start = time.monotonic() - self.session.elapsed_time
 
         await self.accept()
+        await self.send(text_data=json.dumps({"type": "time", "elapsed_time": time.monotonic() - self.session.elapsed_time}))
         print("Authorized client connected.")
 
     @database_sync_to_async
