@@ -6,6 +6,7 @@ class CompletedInterviewSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='completed_interviews')
     created_at = models.DateTimeField(auto_now_add=True)
+    duration = models.FloatField(default=0.0)
 
     emotion_score = models.FloatField(default=0)
     eye_score = models.FloatField(default=0)
@@ -18,8 +19,7 @@ class CompletedInterviewSession(models.Model):
         get_latest_by = "created_at"
 
 class OngoingInterviewSession(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='interview_sessions')
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name='ongoing_session')
 
     emotion_score_total = models.IntegerField(default=0)
     eye_score_total = models.IntegerField(default=0)
