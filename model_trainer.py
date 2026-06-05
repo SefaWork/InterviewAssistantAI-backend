@@ -8,7 +8,6 @@ from sklearn.metrics import accuracy_score, precision_score, f1_score
 from sklearn.utils.class_weight import compute_class_weight
 from datetime import datetime
 
-
 dataset_dir = 'master_veriseti' 
 
 img_height, img_width = 96, 96 
@@ -16,7 +15,6 @@ batch_size = 64
 epochs = 30  
 algorithm_name = "MobileNetV2 (Canlı Optimizasyon) + Veri Füzyonu + Dropout 0.4"
 
-print("🔥 ULTIMATE PLAN: CANLI ORTAM İÇİN HIZ VE DOĞRULUK OPTİMİZASYONU BAŞLIYOR...")
 print("-" * 50)
 
 print("📥 1/5: Master Veri seti yükleniyor (Otomatik %80 Eğitim, %20 Test Bölünerek)...")
@@ -57,7 +55,6 @@ data_augmentation = tf.keras.Sequential([
 print("🏗️ 3/5: Canlı Yayın İçin Ninja Model (MobileNetV2) İnşa Ediliyor...")
 
 base_model = MobileNetV2(input_shape=(img_height, img_width, 3), include_top=False, weights='imagenet')
-
 
 base_model.trainable = True
 for layer in base_model.layers[:-80]:
@@ -127,5 +124,3 @@ if os.path.exists(excel_file):
     updated_data.to_excel(excel_file, index=False)
 else:
     new_data.to_excel(excel_file, index=False)
-
-print(f"✅ MUHTEŞEM! Nihai 'mulakat_ai_beyni.h5' başarıyla üretildi ve canlı teste hazır!")
