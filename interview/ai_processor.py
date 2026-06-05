@@ -36,7 +36,7 @@ class InterviewAI:
 
         face_detected = len(faces) > 0
         face_count = len(faces)
-        emotion = "none"
+        emotion = "unknown"
         confidence = 0.0
 
         if face_detected and self.emotion_model:

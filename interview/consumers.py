@@ -168,7 +168,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             self.session.emotion_score_total+=EMOTION_SCORE_WEIGHTS(result.emotion)
             self.session.eye_score_total+=result["eye_contact_score"]
 
-            if result.emotion == "none":
+            if result.emotion == "unknown":
                 self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
             else:
                 self.session[result.emotion]+=1
