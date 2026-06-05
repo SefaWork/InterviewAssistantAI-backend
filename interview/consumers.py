@@ -6,6 +6,7 @@ from django.contrib.auth.models import AnonymousUser
 from .ai_processor import InterviewAI
 from .models import OngoingInterviewSession, CompletedInterviewSession
 from django.core.cache import cache
+from .emotion_weights import EMOTION_SCORE_WEIGHTS, EMOTION_LIST
 import time
 
 ai_engine = InterviewAI()
@@ -130,9 +131,11 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             return None
         self.session_completed = True
 
-        # Create completed interview.
-        emotion_score = round(self.session.emotion_score_total / self.session.frame_count, 1)
-        eye_score = round(self.session.eye_score_total / self.session.frame_count, 1)
+        frame_count = max(self.session.frame_count, 1)
+
+        # -- Total scores, feedback and durations. -- #
+        emotion_score = round(self.session.emotion_score_total / frame_count, 1)
+        eye_score = round(self.session.eye_score_total / frame_count, 1)
         total_score = round((emotion_score + eye_score) / 2, 1)
 
         duration = time.monotonic() - self.session_start
@@ -142,8 +145,18 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
 
         if latest_session:
             past_analysis_feedback = create_comparison_for_score("emotion", latest_session.emotion_score, emotion_score) + create_comparison_for_score("eye", latest_session.eye_score, eye_score)
-        
-        completed_session = CompletedInterviewSession.objects.create(user=self.scope["user"], emotion_score=emotion_score, eye_score=eye_score, total_score=total_score, feedback=feedback, past_analysis_feedback=past_analysis_feedback, duration=duration)
+        # ------------------------------------------- #
+
+        # -- Individual emotion distributions. -- #
+        distributions = {}
+        total_accounted = 0
+        for emotion_name in EMOTION_LIST:
+            total_accounted += self.session[emotion_name]
+            distributions[emotion_name] = self.session[emotion_name] / frame_count
+        distributions["unknown"] = (frame_count - total_accounted) / frame_count
+        # ---------------------------------------- #
+
+        completed_session = CompletedInterviewSession.objects.create(**distributions, user=self.scope["user"], emotion_score=emotion_score, eye_score=eye_score, total_score=total_score, feedback=feedback, past_analysis_feedback=past_analysis_feedback, duration=duration)
         self.session.delete()
         return completed_session.id
 
@@ -152,9 +165,14 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         if "error" not in result:
             # There was no error, update session scores.
             self.session.frame_count+=1
-            self.session.emotion_score_total+=ai_engine.emotion_scores.get(result["emotion"], 0)
+            self.session.emotion_score_total+=EMOTION_SCORE_WEIGHTS(result.emotion)
             self.session.eye_score_total+=result["eye_contact_score"]
-            self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
+
+            if result.emotion == "none":
+                self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total"])
+            else:
+                self.session[result.emotion]+=1
+                self.session.save(update_fields=["frame_count", "emotion_score_total", "eye_score_total", result.emotion])
             
         return [round(self.session.emotion_score_total / self.session.frame_count, 1), round(self.session.eye_score_total / self.session.frame_count, 1)]
 

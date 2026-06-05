@@ -24,17 +24,6 @@ class InterviewAI:
             4: 'neutral', 5: 'sad', 6: 'shocked'
         }
 
-        self.emotion_scores = {
-            "angry": 0,
-            "disgusted": 0,
-            "scared": 10,
-            "happy": 100,
-            "neutral": 75,
-            "sad": 25,
-            "shocked": 50,
-            "none": 0
-        }
-
     def process_frame(self, image_data):
         nparr = np.frombuffer(image_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
