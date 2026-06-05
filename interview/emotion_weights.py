@@ -1,7 +1,7 @@
 EMOTION_LIST = ["angry", "disgusted", "scared", "sad", "shocked", "neutral", "happy"]
 
 EMOTION_SCORE_WEIGHTS = {
-    "none": 0,
+    "unknown": 0,
     "angry": 0,
     "disgusted": 0,
     "scared": 10,
