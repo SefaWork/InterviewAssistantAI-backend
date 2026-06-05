@@ -19,6 +19,5 @@ class InterviewCreateView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class EmotionWeightsView(APIView):
-
     def get(self):
         return Response(EMOTION_SCORE_WEIGHTS, status=status.HTTP_200_OK)
