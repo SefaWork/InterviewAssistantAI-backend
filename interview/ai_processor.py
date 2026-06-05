@@ -14,24 +14,25 @@ class InterviewAI:
         self.model_path = os.path.join(settings.BASE_DIR, 'mulakat_ai_beyni.h5')
         try:
             self.emotion_model = load_model(self.model_path)
-            print("✅ Kendi Eğittiğimiz Yapay Zeka Beyni Başarıyla Yüklendi!")
+            print("ML model loaded.")
         except Exception as e:
             self.emotion_model = None
-            print(f"⚠️ Uyarı: Yapay zeka modeli yüklenemedi. Hata: {e}")
+            print(f"ML model failed to load. Error: {e}")
 
         self.emotion_labels = {
-            0: 'Kızgın', 1: 'İğrenme', 2: 'Korku', 3: 'Mutlu', 
-            4: 'Nötr', 5: 'Üzgün', 6: 'Şaşkın'
+            0: 'angry', 1: 'disgusted', 2: 'scared', 3: 'happy', 
+            4: 'neutral', 5: 'sad', 6: 'shocked'
         }
 
         self.emotion_scores = {
-            "Kızgın": 0,
-            "İğrenme": 0,
-            "Korku": 10,
-            "Mutlu": 100,
-            "Nötr": 75,
-            "Üzgün": 25,
-            "Şaşkın": 50
+            "angry": 0,
+            "disgusted": 0,
+            "scared": 10,
+            "happy": 100,
+            "neutral": 75,
+            "sad": 25,
+            "shocked": 50,
+            "none": 0
         }
 
     def process_frame(self, image_data):
@@ -39,14 +40,14 @@ class InterviewAI:
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if frame is None:
-            return {"error": "Görüntü okunamadı"}
+            return {"error": "Couldn't read input image."}
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
 
         face_detected = len(faces) > 0
         face_count = len(faces)
-        emotion = "Yüz Bulunamadı"
+        emotion = "none"
         confidence = 0.0
 
         if face_detected and self.emotion_model:
