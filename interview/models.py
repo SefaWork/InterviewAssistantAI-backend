@@ -25,6 +25,10 @@ class CompletedInterviewSession(models.Model):
     feedback = models.TextField(blank=True, null=True)
     past_analysis_feedback = models.TextField(blank=True, null=True)
 
+    # Question fields.
+    question_list = models.JSONField(default=list)
+    question_answer_times = models.JSONField(default=list)
+
     class Meta:
         get_latest_by = "created_at"
 
@@ -42,6 +46,11 @@ class OngoingInterviewSession(models.Model):
     shocked = models.IntegerField(default=0)
     neutral = models.IntegerField(default=0)
     scared = models.IntegerField(default=0)
+
+    # Question fields.
+    question_list = models.JSONField(default=list)
+    question_answer_times = models.JSONField(default=list)
+    question_elapsed_time = models.FloatField(default=0.0)
 
     # Other score fields.
     emotion_score_total = models.IntegerField(default=0)

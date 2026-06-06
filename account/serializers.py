@@ -10,4 +10,4 @@ class SessionListSerializer(serializers.ModelSerializer):
 class SessionDisplaySerializer(serializers.ModelSerializer):
     class Meta:
         model = CompletedInterviewSession
-        fields = ('id', 'created_at', 'emotion_score', 'eye_score', 'total_score', 'feedback', 'past_analysis_feedback', 'duration', *EMOTION_LIST, "unknown")
+        fields = ('id', 'created_at', 'emotion_score', 'eye_score', 'total_score', 'feedback', 'past_analysis_feedback', 'duration', *EMOTION_LIST, "unknown", "question_list", "question_answer_times")

@@ -7,8 +7,9 @@ from .ai_processor import InterviewAI
 from .models import OngoingInterviewSession, CompletedInterviewSession
 from django.core.cache import cache
 from .emotion_weights import EMOTION_SCORE_WEIGHTS, EMOTION_LIST
+from .interview_questions import interview_questions
 from asgiref.sync import sync_to_async
-import time
+import time, random
 
 ai_engine = InterviewAI()
 
@@ -46,10 +47,15 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
 
         self.session_completed = False
         self.marked_complete = False
+
         self.session_start = time.monotonic() - self.session.elapsed_time
+        self.question_start = time.monotonic() - self.session.question_elapsed_time
+
+        self.processing_frame = False
 
         await self.accept()
         await self.send(text_data=json.dumps({"type": "time", "elapsed_time": time.monotonic() - self.session_start}))
+        await self.continue_question()
         print("Authorized client connected.")
 
     @database_sync_to_async
@@ -70,7 +76,8 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
     def release_session(self):
         if self.session and not self.session_completed:
             self.session.elapsed_time = time.monotonic() - self.session_start
-            self.session.save(update_fields=["elapsed_time"])
+            self.session.question_elapsed_time = time.monotonic() - self.question_start
+            self.session.save(update_fields=["elapsed_time", "question_elapsed_time"])
         cache.delete(f"session_lock:{self.scope["user"].id}")
 
     @database_sync_to_async
@@ -87,34 +94,101 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         await self.release_session()
         print(f"Client disconnected: {close_code}")
 
+    async def continue_question(self):
+        current_question = self.session.question_list[-1] if self.session.question_list else None
+        if current_question is None:
+            return await self.start_next_question(self.get_next_question())
+        
+        await self.set_question(current_question)
+        await self.send(text_data=json.dumps({"type": "question", "question": current_question}))
+
+    async def start_next_question(self, question, *, no_send=False):
+        if question is None:
+            question = "none"
+
+        await self.set_question(question)
+        self.question_start = time.monotonic()
+
+        if last_question == "none":
+            return
+        
+        if not no_send: await self.send(text_data=json.dumps({"type": "question", "question": question}))
+
     async def receive(self, text_data=None, bytes_data=None):
         if self.session_completed:
             return
 
         # Handle binary image data directly.
         if bytes_data:
+            if self.processing_frame:
+                return
+            self.processing_frame = True
             result = await self.process_image(bytes_data)
+            self.processing_frame = False
             if result is not None:
                 await self.send(text_data=json.dumps({
                     "type": "result",
                     "data": result
                 }))
-        
+
         # Handle JSON data.
         elif text_data:
             message = json.loads(text_data)
 
             if message["type"] == "finish" and time.monotonic() - self.session_start > 60:
                 self.marked_complete = True
+                return
+
+            if message["type"] == "question" and time.monotonic():
+                return await self.start_next_question(self.get_next_question())
 
             elif message["type"] == "ping":
                 await self.send(text_data=json.dumps({"type": "pong"}))
+                return
+
+    @database_sync_to_async
+    def set_question(self, question):
+        old_question = self.session.question_list[-1] if self.session.question_list else None
+
+        if question is not None and question != "none":
+            self.session.question_list.append(question)
+
+        if old_question is not None and old_question != question and old_question != "none":
+            self.session.question_answer_times.append(time.monotonic() - self.question_start)
+
+        self.session.save()
+
+    def get_next_question(self):
+        question_category_index = 0
+        elapsed_time = time.monotonic() - self.session_start
+
+        if elapsed_time < 60:
+            question_category_index = 0
+        elif elapsed_time < 180:
+            question_category_index = 1
+        else:
+            question_category_index = 2
+
+        old_questions = self.session.question_list
+
+        while True:
+            new_questions = interview_questions[question_category_index]
+            filtered = [item for item in new_questions if item not in old_questions ]
+
+            if len(filtered) == 0:
+                question_category_index+=1
+                if question_category_index >= len(interview_questions):
+                    return None
+                continue
+            randQuestion = random.choice(filtered)
+            return randQuestion
 
     async def process_image(self, image_bytes: bytes) -> dict:
         result = await sync_to_async(ai_engine.process_frame)(image_bytes)
         newAvgs = await self.add_result(result)
 
         if self.marked_complete or time.monotonic() - self.session_start > SESSION_MAX_TIME:
+            await self.start_next_question("none", no_send=True)
             completed_session_id = await self.complete_session(await self.get_latest_completed_session())
             if completed_session_id is None:
                 await self.send(text_data=json.dumps({"type": "session_complete"}))
@@ -158,7 +232,18 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         distributions["unknown"] = (frame_count - total_accounted) / frame_count
         # ---------------------------------------- #
 
-        completed_session = CompletedInterviewSession.objects.create(**distributions, user=self.scope["user"], emotion_score=emotion_score, eye_score=eye_score, total_score=total_score, feedback=feedback, past_analysis_feedback=past_analysis_feedback, duration=duration)
+        completed_session = CompletedInterviewSession.objects.create(
+            **distributions, 
+            user=self.scope["user"], 
+            emotion_score=emotion_score, 
+            eye_score=eye_score, 
+            total_score=total_score, 
+            feedback=feedback, 
+            past_analysis_feedback=past_analysis_feedback, 
+            duration=duration,
+            question_list=self.session.question_list,
+            question_answer_times=self.session.question_answer_times
+        )
         self.session.delete()
         return completed_session.id
 
