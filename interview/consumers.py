@@ -7,6 +7,7 @@ from .ai_processor import InterviewAI
 from .models import OngoingInterviewSession, CompletedInterviewSession
 from django.core.cache import cache
 from .emotion_weights import EMOTION_SCORE_WEIGHTS, EMOTION_LIST
+from asgiref.sync import sync_to_async
 import time
 
 ai_engine = InterviewAI()
@@ -109,8 +110,10 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             elif message["type"] == "ping":
                 await self.send(text_data=json.dumps({"type": "pong"}))
 
-    async def process_image(self, image_bytes: bytes) -> dict:
-        result = ai_engine.process_frame(image_bytes)
+async def process_image(self, image_bytes: bytes) -> dict:
+        
+        result = await sync_to_async(ai_engine.process_frame)(image_bytes)
+        
         newAvgs = await self.add_result(result)
 
         if self.marked_complete or time.monotonic() - self.session_start > SESSION_MAX_TIME:

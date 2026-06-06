@@ -10,13 +10,14 @@ class InterviewCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Reject if user has an ongoing session.
+        
         if OngoingInterviewSession.objects.filter(user=request.user).exists():
             return Response({"error": "You already have an ongoing session."}, status=status.HTTP_409_CONFLICT)
 
-        # Create session.
+        
         OngoingInterviewSession.objects.create(user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class EmotionWeightsView(APIView):
     def get(self, request):

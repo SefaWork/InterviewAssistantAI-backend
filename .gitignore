@@ -1,11 +1,15 @@
+# Ortam ve Önbellek Dosyaları
 venv/
 __pycache__/
-*.py[cod]
-db.sqlite3
-media/
-.vscode/
 *.pyc
-fer2013/
+*.pyo
+
+# Veritabanı
+db.sqlite3
+
+# Veri Setleri ve Modeller
 fer2013.csv
-test_yuz.jpg
-ai_ne_gordu.jpg
+master_veriseti/
+renkli_veriseti/
+yeni_veriseti/
+archive*/
