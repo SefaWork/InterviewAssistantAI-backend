@@ -48,7 +48,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         self.session_start = time.monotonic() - self.session.elapsed_time
 
         await self.accept()
-        await self.send(text_data=json.dumps({"type": "time", "elapsed_time": time.monotonic() - self.session.elapsed_time}))
+        await self.send(text_data=json.dumps({"type": "time", "elapsed_time": time.monotonic() - self.session_start}))
         print("Authorized client connected.")
 
     @database_sync_to_async
@@ -103,7 +103,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         elif text_data:
             message = json.loads(text_data)
 
-            if message["type"] == "finish":
+            if message["type"] == "finish" and time.monotonic() - self.session_start > 60:
                 self.marked_complete = True
 
             elif message["type"] == "ping":
