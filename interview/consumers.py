@@ -110,10 +110,8 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
             elif message["type"] == "ping":
                 await self.send(text_data=json.dumps({"type": "pong"}))
 
-async def process_image(self, image_bytes: bytes) -> dict:
-        
+    async def process_image(self, image_bytes: bytes) -> dict:
         result = await sync_to_async(ai_engine.process_frame)(image_bytes)
-        
         newAvgs = await self.add_result(result)
 
         if self.marked_complete or time.monotonic() - self.session_start > SESSION_MAX_TIME:
