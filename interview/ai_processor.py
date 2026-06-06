@@ -15,20 +15,19 @@ class InterviewAI:
             cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         )
         
-        
         self.model_path = os.path.join(settings.BASE_DIR, 'mulakat_ai_beyni.h5')
         try:
             self.emotion_model = load_model(self.model_path)
-            print("✅ Kendi Eğittiğimiz Yapay Zeka Beyni Başarıyla Yüklendi!")
+            print("ML model loaded.")
         except Exception as e:
             self.emotion_model = None
-            print(f"⚠️ Uyarı: Yapay zeka modeli yüklenemedi. Hata: {e}")
+            print(f"ML model failed to load. Error: {e}")
 
-        
         self.emotion_labels = {
-            0: 'Kızgın', 1: 'İğrenme', 2: 'Korku', 3: 'Mutlu', 
-            4: 'Nötr', 5: 'Üzgün', 6: 'Şaşkın'
+            0: 'angry', 1: 'disgusted', 2: 'scared', 3: 'happy', 
+            4: 'neutral', 5: 'sad', 6: 'shocked'
         }
+        
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             max_num_faces=1, 
@@ -48,11 +47,9 @@ class InterviewAI:
             return False
             
         oran = (iris_x - ic_x) / goz_genisligi
-        
         return 0.40 < oran < 0.60
 
     def process_frame(self, image_data):
-        
         if isinstance(image_data, str) and ',' in image_data:
             image_data = image_data.split(',')[1]
             img_bytes = base64.b64decode(image_data)
@@ -63,26 +60,23 @@ class InterviewAI:
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if frame is None:
-            return {"error": "Görüntü okunamadı"}
+            return {"error": "Couldn't read input image."}
 
         h, w, _ = frame.shape
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-       
         face_detected = False
         face_count = 0
         eye_contact = False
         emotion = "Yüz Bulunamadı"
         confidence = 0.0
 
-        
         mesh_results = self.face_mesh.process(rgb_frame)
         if mesh_results.multi_face_landmarks:
             landmarks = mesh_results.multi_face_landmarks[0].landmark
             eye_contact = self._check_eye_contact(landmarks, w, h)
 
-        
         faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
         
         if len(faces) > 0:
@@ -91,7 +85,6 @@ class InterviewAI:
             
             if self.emotion_model:
                 (x, y, w_box, h_box) = faces[0]
-                
                 
                 margin_x = int(w_box * 0.2)
                 margin_y = int(h_box * 0.2)
@@ -104,7 +97,6 @@ class InterviewAI:
                 face_roi = frame[y1:y2, x1:x2]
                 face_rgb = cv2.cvtColor(face_roi, cv2.COLOR_BGR2RGB)
                 
-               
                 cv2.imwrite("ai_ne_gordu.jpg", cv2.cvtColor(face_rgb, cv2.COLOR_RGB2BGR))
                 
                 resized_face = cv2.resize(face_rgb, (96, 96))

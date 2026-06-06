@@ -11,25 +11,19 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-
-
-
 SECRET_KEY = 'django-insecure-1$92n0gn(-&$j(zk8*)x#ttlmpl#qr4i3-n2*am&or&rny@gtg'
-
 
 DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
-
-
 INSTALLED_APPS = [
+    "daphne",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -38,8 +32,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    "channels",
     'authentication',  
     'interview',
+    'account'
 ]
 
 MIDDLEWARE = [
@@ -71,9 +67,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
-
-
-
+ASGI_APPLICATION = 'core.asgi.application'
 
 DATABASES = {
     'default': {
@@ -82,8 +76,13 @@ DATABASES = {
     }
 }
 
-
-
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"  # use Redis in production
+        # "BACKEND": "channels_redis.core.RedisChannelLayer",
+        # "CONFIG": {"hosts": [("127.0.0.1", 6379)]},
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -100,9 +99,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-
-
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
@@ -111,14 +107,33 @@ USE_I18N = True
 
 USE_TZ = True
 
-
-
-
 STATIC_URL = 'static/'
-
-
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'authentication.User'
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+]
+
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = False  # since you're on HTTP dev
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_COOKIE_REFRESH': 'refresh_token',
+    'AUTH_COOKIE_SECURE': False,
+    'AUTH_COOKIE_HTTP_ONLY': True,
+    'AUTH_COOKIE_SAMESITE': 'None',
+    'AUTH_COOKIE_PATH': '/',
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication'
+    ]
+}

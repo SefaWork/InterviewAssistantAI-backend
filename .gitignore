@@ -1,5 +1,15 @@
-master_veriseti/
-yeni_veriseti/
-renkli_veriseti/
-archive*/
+# Ortam ve Önbellek Dosyaları
 venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Veritabanı
+db.sqlite3
+
+# Veri Setleri ve Modeller
+fer2013.csv
+master_veriseti/
+renkli_veriseti/
+yeni_veriseti/
+archive*/
