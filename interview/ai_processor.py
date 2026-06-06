@@ -69,7 +69,7 @@ class InterviewAI:
         face_detected = False
         face_count = 0
         eye_contact = False
-        emotion = "Yüz Bulunamadı"
+        emotion = "Unknown"
         confidence = 0.0
 
         mesh_results = self.face_mesh.process(rgb_frame)
