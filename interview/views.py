@@ -11,10 +11,11 @@ class InterviewCreateView(APIView):
 
     def post(self, request):
         
+        # If session already exists, return conflict error.
         if OngoingInterviewSession.objects.filter(user=request.user).exists():
             return Response({"error": "You already have an ongoing session."}, status=status.HTTP_409_CONFLICT)
 
-        
+        # Create new session.        
         OngoingInterviewSession.objects.create(user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
