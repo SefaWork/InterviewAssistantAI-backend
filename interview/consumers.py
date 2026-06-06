@@ -150,10 +150,13 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
     def set_question(self, question):
         old_question = self.session.question_list[-1] if self.session.question_list else None
 
+        if old_question == question:
+            return
+
         if question is not None and question != "none":
             self.session.question_list.append(question)
 
-        if old_question is not None and old_question != question and old_question != "none":
+        if old_question is not None and old_question != "none":
             self.session.question_answer_times.append(time.monotonic() - self.question_start)
 
         self.session.save()
