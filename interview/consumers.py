@@ -109,6 +109,7 @@ class ImageStreamConsumer(AsyncWebsocketConsumer):
         await self.set_question(question)
         self.question_start = time.monotonic()
 
+        last_question = self.session.question_list[-1] if self.session.question_list else "none"
         if last_question == "none":
             return
         
