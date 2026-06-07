@@ -49,7 +49,7 @@ python manage.py migrate
 
 **5. Start the server:**
 ```bash
-python manage.py runserver
+daphne -p 8000 core.asgi:application
 ```
 
 ## Data Output Format
