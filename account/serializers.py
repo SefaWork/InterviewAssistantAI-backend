@@ -5,7 +5,7 @@ from interview.emotion_weights import EMOTION_LIST
 class SessionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompletedInterviewSession
-        fields = ('id', 'created_at', 'total_score', 'duration')
+        fields = ('id', 'created_at', 'total_score', 'duration', *EMOTION_LIST, "unknown")
 
 class SessionDisplaySerializer(serializers.ModelSerializer):
     class Meta:
