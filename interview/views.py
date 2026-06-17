@@ -19,6 +19,17 @@ class InterviewCreateView(APIView):
         OngoingInterviewSession.objects.create(user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class InterviewForceCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        
+        # Delete existing session if it exists.
+        OngoingInterviewSession.objects.filter(user=request.user).delete()
+
+        # Create new session.
+        OngoingInterviewSession.objects.create(user=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class EmotionWeightsView(APIView):
     def get(self, request):
